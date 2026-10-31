@@ -86,7 +86,7 @@ ALGORITHMES = {
     "MD5": (_hashlib("md5"), 128, "cassé (collisions faciles)"),
 }
 
-# Identifiant d'un octet utilisé dans le canal et dans le bourrage de signature.
+# Code de la fonction de hachage, écrit dans le canal.
 CODES_HASH = {
     "SHA-256 (implémenté)": "01",
     "SHA-512": "02",

@@ -1,17 +1,27 @@
-# SSAD TP1 - Partie 4 : Authenticité / Intégrité
+# SSAD TP1 - Partie 4 : Intégrité
 
-Python 3, bibliothèque standard uniquement (tkinter, hashlib, secrets).
+Réalisation de l'objectif **intégrité** en suivant le chapitre 3 du cours
+(fonction de hachage et signature numérique). Python 3, bibliothèque standard uniquement.
+
+## Principe
+
+A calcule l'empreinte `h = H(M)` et la signe avec sa **clé privée** ; B recalcule
+l'empreinte et vérifie la signature avec la **clé publique** de A. La clé privée n'est
+jamais envoyée dans le canal. Si le message ou la signature est modifié, `h1 ≠ h2`.
 
 ## Contenu
 
 | Fichier | Rôle |
 |---------|------|
-| `partie4/hachage.py` | SHA-256 écrit à la main + MD5, SHA-1, SHA-512, SHA3-256 ; effet avalanche |
-| `partie4/rsa.py` | RSA à la main : clés publique/privée, signature et vérification |
-| `partie4/hmac_dh.py` | Échange Diffie-Hellman et HMAC écrit à la main |
-| `partie4/integrite.py` | Format du canal et vérification automatique par B |
+| `partie4/arithmetique.py` | Exponentiation modulaire rapide (CExpMod), Euclide étendu, nombres premiers |
+| `partie4/hachage.py` | SHA-256 écrit à la main + MD5, SHA-1, SHA-512, SHA3-256 |
+| `partie4/rsa.py` | Signature RSA (cours 3.5.1) |
+| `partie4/rabin.py` | Signature de Rabin (cours 3.5.2) |
+| `partie4/merkle_hellman.py` | Signature de Merkle-Hellman (cours 3.5.3), cassé par Shamir : usage pédagogique |
+| `partie4/elgamal.py` | Signature d'ElGamal (cours 3.5.4) |
+| `partie4/integrite.py` | Format du canal, envoi signé, vérification automatique |
 | `app.py` | Interface Tkinter : onglets Intégrité et Hachage |
-| `tests_partie4.py` | 18 tests unitaires et mesures de performance |
+| `tests_partie4.py` | 19 tests (dont les exemples du cours) et mesures de performance |
 
 ## Lancement
 
@@ -20,10 +30,4 @@ python app.py
 python tests_partie4.py
 ```
 
-## Principe
-
-A hache le message puis prouve son intégrité avec une clé qui n'est jamais envoyée dans le canal :
-- **Signature RSA** : A signe avec sa clé privée, B vérifie avec la clé publique de A.
-- **HMAC + Diffie-Hellman** : A et B échangent leurs clés publiques et calculent chacun la même clé secrète.
-
-Format du canal : `MODE|code_hash|message|preuve` (`SIG` ou `MAC`).
+Format du canal : `ALGO|code_hash|message|signature` avec `ALGO` = `RSA`, `RAB`, `MKH` ou `ELG`.

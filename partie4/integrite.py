@@ -1,72 +1,75 @@
-"""Facade de la partie 4 (authenticité / intégrité) et format du canal.
+"""Facade de la partie 4 (intégrité) et format du canal.
 
-Format du message dans le canal :  MODE|code_hash|message|preuve
-  - MODE = SIG : preuve = signature RSA (hexadécimal)
-  - MODE = MAC : preuve = HMAC calculé avec la clé Diffie-Hellman
-Aucune clé privée ni clé secrète n'apparaît dans ce format.
+Toutes les méthodes suivent le principe de la signature numérique du cours
+(3.5) : A calcule l'empreinte h = H(M) et la signe avec sa clé PRIVÉE ;
+B recalcule H(M) et vérifie la signature avec la clé PUBLIQUE de A.
+
+Format du message dans le canal :  ALGO|code_hash|message|signature
+La clé privée n'apparaît jamais dans ce format.
 """
 
+from . import elgamal, merkle_hellman, rabin, rsa
+from .arithmetique import exp_mod
 from .hachage import (
     ALGORITHMES, CODES_HASH, HASH_PAR_CODE, effet_avalanche, hacher, hacher_hex,
     sha256_manuel,
 )
-from .hmac_dh import generer_cles_dh, hmac, secret_partage, verifier_hmac
-from .rsa import generer_cles, signer, verifier
 
-MODES = {"Signature RSA": "SIG", "HMAC + Diffie-Hellman": "MAC"}
-MODE_PAR_CODE = {code: name for name, code in MODES.items()}
+SIGNATURES = {m.NOM: m for m in (rsa, rabin, elgamal, merkle_hellman)}
+CODES_SIGNATURE = {"RSA": "RSA", "Rabin": "RAB", "ElGamal": "ELG", "Merkle-Hellman": "MKH"}
+SIGNATURE_PAR_CODE = {code: nom for nom, code in CODES_SIGNATURE.items()}
 
 
-def construire_message_canal(mode, algorithme, message, preuve):
+def generer_cles(algorithme_signature):
+    return SIGNATURES[algorithme_signature].generer_cles()
+
+
+def construire_message_canal(signature_algo, algorithme, message, signature):
     try:
-        return "%s|%s|%s|%s" % (MODES[mode], CODES_HASH[algorithme], message, preuve)
+        return "%s|%s|%s|%s" % (
+            CODES_SIGNATURE[signature_algo], CODES_HASH[algorithme], message, signature,
+        )
     except KeyError as error:
-        raise ValueError("mode ou algorithme inconnu") from error
+        raise ValueError("algorithme inconnu") from error
 
 
 def lire_message_canal(message_canal):
-    """Retourne (mode, algorithme, message, preuve)."""
+    """Retourne (algorithme de signature, algorithme de hachage, message, signature)."""
     parts = message_canal.split("|", 2)
     if len(parts) != 3 or "|" not in parts[2]:
         raise ValueError("message du canal invalide : champs manquants")
-    code_mode, code_hash, reste = parts
-    message, preuve = reste.rsplit("|", 1)
+    code_signature, code_hash, reste = parts
+    message, signature = reste.rsplit("|", 1)
     try:
-        return MODE_PAR_CODE[code_mode], HASH_PAR_CODE[code_hash], message, preuve
+        return SIGNATURE_PAR_CODE[code_signature], HASH_PAR_CODE[code_hash], message, signature
     except KeyError as error:
-        raise ValueError("mode ou code de hachage inconnu dans le canal") from error
+        raise ValueError("code d'algorithme inconnu dans le canal") from error
 
 
-def envoyer_signe(message, cle_privee_a, algorithme):
-    signature = signer(message, cle_privee_a, algorithme)
-    return construire_message_canal("Signature RSA", algorithme, message, signature)
+def envoyer_signe(signature_algo, message, cle_privee, algorithme):
+    """Entité A : h = H(M), S = signature de h avec la clé privée, envoi de (M, S)."""
+    signature = SIGNATURES[signature_algo].signer(message, cle_privee, algorithme)
+    return construire_message_canal(signature_algo, algorithme, message, signature)
 
 
-def envoyer_hmac(message, cle_secrete, algorithme):
-    tag = hmac(cle_secrete, message, algorithme)
-    return construire_message_canal("HMAC + Diffie-Hellman", algorithme, message, tag)
+def verification_automatique(message_canal, cles_publiques):
+    """Entité B : lit l'algorithme dans le canal et vérifie avec la clé publique de A.
 
-
-def verification_automatique(message_canal, cle_publique_a=None, cle_secrete_b=None):
-    """B lit le mode et l'algorithme dans le canal puis vérifie la preuve.
-
-    Retourne (valide, mode, algorithme, message, empreinte attendue, empreinte reçue).
+    cles_publiques : {nom de l'algorithme de signature: clé publique de A}.
+    Retourne (valide, algorithme de signature, algorithme de hachage, message, h1, h2).
     """
-    mode, algorithme, message, preuve = lire_message_canal(message_canal)
-    if mode == "Signature RSA":
-        if cle_publique_a is None:
-            raise ValueError("la clé publique de A est requise")
-        valide, attendu, obtenu = verifier(message, preuve, cle_publique_a, algorithme)
-        return valide, mode, algorithme, message, attendu.hex(), obtenu.hex()
-    if cle_secrete_b is None:
-        raise ValueError("la clé secrète Diffie-Hellman de B est requise")
-    valide, attendu = verifier_hmac(cle_secrete_b, message, preuve, algorithme)
-    return valide, mode, algorithme, message, attendu, preuve
+    signature_algo, algorithme, message, signature = lire_message_canal(message_canal)
+    try:
+        valide, h1, h2 = SIGNATURES[signature_algo].verifier(
+            message, signature, cles_publiques[signature_algo], algorithme,
+        )
+    except (ValueError, KeyError):
+        valide, h1, h2 = False, 0, 0          # signature illisible = signature invalide
+    return valide, signature_algo, algorithme, message, h1, h2
 
 
 __all__ = [
-    "ALGORITHMES", "MODES", "construire_message_canal", "lire_message_canal",
-    "envoyer_signe", "envoyer_hmac", "verification_automatique", "generer_cles",
-    "generer_cles_dh", "secret_partage", "hacher", "hacher_hex", "sha256_manuel",
-    "effet_avalanche", "hmac", "signer", "verifier",
+    "ALGORITHMES", "SIGNATURES", "construire_message_canal", "lire_message_canal",
+    "envoyer_signe", "verification_automatique", "generer_cles", "hacher", "hacher_hex",
+    "sha256_manuel", "effet_avalanche", "exp_mod",
 ]

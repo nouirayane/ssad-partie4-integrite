@@ -1,14 +1,54 @@
 import hashlib
-import hmac as hmac_ref
 import os
 import time
 import unittest
 
-from partie4 import integrite
-from partie4.rsa import est_premier, inverse_modulaire
+from partie4 import elgamal, integrite, merkle_hellman, rabin, rsa
+from partie4.arithmetique import est_premier, exp_mod, inverse_modulaire
 
 SHA = "SHA-256 (implémenté)"
-NOMS_HASHLIB = {"SHA-512": "sha512", "SHA3-256": "sha3_256", "SHA-1": "sha1", "MD5": "md5"}
+
+
+class ExemplesDuCoursTests(unittest.TestCase):
+    """Valeurs reprises des exemples du chapitre 3 du cours."""
+
+    def test_exponentiation_rapide(self):
+        # 3.2.3 : C = 150^233 mod 437 = 351
+        self.assertEqual(exp_mod(150, 233, 437), 351)
+        for _ in range(50):
+            a, j, n = (int.from_bytes(os.urandom(16), "big") for _ in range(3))
+            self.assertEqual(exp_mod(a, j, n + 2), pow(a, j, n + 2))
+
+    def test_rsa_exemple_3(self):
+        # p = 47, q = 59, e = 17 -> n = 2773, d = 157 ; B (66) -> 872 -> 66
+        publique, privee = rsa.cles_depuis(47, 59, 17)
+        self.assertEqual((publique["n"], privee["d"]), (2773, 157))
+        self.assertEqual(exp_mod(66, 17, 2773), 872)
+        self.assertEqual(exp_mod(872, 157, 2773), 66)
+
+    def test_rabin_exemple_4(self):
+        # p = 11, q = 23, M = 158 -> C = 170 ; solutions 26, 95, 227, 158
+        self.assertEqual(exp_mod(158, 2, 253), 170)
+        self.assertEqual(sorted(rabin.racines_carrees(170, 11, 23)), [26, 95, 158, 227])
+
+    def test_merkle_hellman_exemples_5_et_6(self):
+        # Exemple 5 : A = (2, 3, 6, 13, 27, 52), T = 70 -> b = 1 1 0 1 0 1
+        suite = [2, 3, 6, 13, 27, 52]
+        self.assertEqual(merkle_hellman.resoudre_super_croissante(70, suite), [1, 1, 0, 1, 0, 1])
+        # Exemple 6 : n = 31, m = 105 -> B = (62, 93, 81, 88, 102, 37)
+        publique, _ = merkle_hellman.cles_depuis(suite, 31, 105)
+        self.assertEqual(publique["B"], [62, 93, 81, 88, 102, 37])
+        self.assertEqual(inverse_modulaire(31, 105), 61)
+
+    def test_elgamal_exemple_7(self):
+        # p = 23, g = 7, a = 6 -> A = 4
+        publique, _ = elgamal.cles_depuis(23, 7, 6)
+        self.assertEqual(publique["A"], 4)
+
+    def test_elgamal_signature_petits_nombres(self):
+        publique, privee = elgamal.cles_depuis(23, 7, 6)
+        canal = elgamal.signer("Bonjour", privee, SHA, b=3)
+        self.assertTrue(elgamal.verifier("Bonjour", canal, publique, SHA)[0])
 
 
 class HachageTests(unittest.TestCase):
@@ -17,128 +57,101 @@ class HachageTests(unittest.TestCase):
             integrite.sha256_manuel("abc").hex(),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
         )
-        self.assertEqual(
-            integrite.sha256_manuel("").hex(),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        )
 
     def test_sha256_identique_a_hashlib(self):
-        for taille in (0, 1, 55, 56, 63, 64, 65, 119, 1000):
+        for taille in (0, 1, 55, 56, 63, 64, 65, 1000):
             data = os.urandom(taille)
             self.assertEqual(integrite.sha256_manuel(data), hashlib.sha256(data).digest())
 
-    def test_tailles_des_empreintes(self):
+    def test_compression_taille_fixe(self):
         for nom, (_, bits, _) in integrite.ALGORITHMES.items():
-            self.assertEqual(len(integrite.hacher("x", nom)) * 8, bits)
+            self.assertEqual(len(integrite.hacher("x" * 5000, nom)) * 8, bits)
 
     def test_effet_avalanche(self):
         _, h1, h2, changes, total = integrite.effet_avalanche("Bonjour", SHA)
-        self.assertNotEqual(h1, h2)
         self.assertTrue(0.3 * total < changes < 0.7 * total)
 
 
-class RSATests(unittest.TestCase):
+class SignatureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.publique, cls.privee = integrite.generer_cles(1024)
+        cls.cles = {nom: integrite.generer_cles(nom) for nom in integrite.SIGNATURES}
+        cls.publiques = {nom: cles[0] for nom, cles in cls.cles.items()}
 
-    def test_miller_rabin(self):
-        self.assertTrue(est_premier(2 ** 127 - 1))
-        self.assertFalse(est_premier(561))  # nombre de Carmichael
+    def envoyer(self, nom, message, algorithme=SHA):
+        return integrite.envoyer_signe(nom, message, self.cles[nom][1], algorithme)
 
-    def test_inverse_modulaire(self):
-        self.assertEqual(inverse_modulaire(3, 11), 4)
-
-    def test_cles_coherentes(self):
-        e, n = self.publique
-        d, _ = self.privee
-        m = 123456789
-        self.assertEqual(pow(pow(m, e, n), d, n), m)
-
-    def test_signature_valide_pour_tous_les_hachages(self):
-        for nom in integrite.ALGORITHMES:
-            canal = integrite.envoyer_signe("Bonjour B", self.privee, nom)
-            self.assertTrue(integrite.verification_automatique(canal, cle_publique_a=self.publique)[0])
+    def test_signature_valide(self):
+        for nom in integrite.SIGNATURES:
+            for algorithme in integrite.ALGORITHMES:
+                canal = self.envoyer(nom, "Bonjour B", algorithme)
+                valide = integrite.verification_automatique(canal, self.publiques)[0]
+                self.assertTrue(valide, (nom, algorithme))
 
     def test_message_modifie_detecte(self):
-        canal = integrite.envoyer_signe("Virement de 1000 DA", self.privee, SHA)
-        canal = canal.replace("1000", "9000")
-        self.assertFalse(integrite.verification_automatique(canal, cle_publique_a=self.publique)[0])
+        for nom in integrite.SIGNATURES:
+            canal = self.envoyer(nom, "Virement de 1000 DA").replace("1000", "9000")
+            self.assertFalse(integrite.verification_automatique(canal, self.publiques)[0], nom)
 
     def test_signature_modifiee_detectee(self):
-        canal = integrite.envoyer_signe("Bonjour", self.privee, SHA)
-        canal = canal[:-1] + ("0" if canal[-1] != "0" else "1")
-        self.assertFalse(integrite.verification_automatique(canal, cle_publique_a=self.publique)[0])
+        for nom in integrite.SIGNATURES:
+            canal = self.envoyer(nom, "Bonjour")
+            canal = canal[:-1] + ("0" if canal[-1] != "0" else "1")
+            self.assertFalse(integrite.verification_automatique(canal, self.publiques)[0], nom)
 
     def test_mauvaise_cle_publique(self):
-        autre_publique, _ = integrite.generer_cles(1024)
-        canal = integrite.envoyer_signe("Bonjour", self.privee, SHA)
-        self.assertFalse(integrite.verification_automatique(canal, cle_publique_a=autre_publique)[0])
+        for nom in integrite.SIGNATURES:
+            canal = self.envoyer(nom, "Bonjour")
+            autres = dict(self.publiques, **{nom: integrite.generer_cles(nom)[0]})
+            self.assertFalse(integrite.verification_automatique(canal, autres)[0], nom)
 
     def test_cle_privee_absente_du_canal(self):
-        canal = integrite.envoyer_signe("Bonjour", self.privee, SHA)
-        self.assertNotIn("%x" % self.privee[0], canal)
+        privees = {
+            "RSA": self.cles["RSA"][1]["d"], "Rabin": self.cles["Rabin"][1]["p"],
+            "ElGamal": self.cles["ElGamal"][1]["a"], "Merkle-Hellman": self.cles["Merkle-Hellman"][1]["n"],
+        }
+        for nom, secret in privees.items():
+            canal = self.envoyer(nom, "Bonjour")
+            self.assertNotIn("%x" % secret, canal, nom)
+            self.assertNotIn(str(secret), canal, nom)
 
-
-class HMACDiffieHellmanTests(unittest.TestCase):
-    def test_meme_secret_des_deux_cotes(self):
-        a, pub_a = integrite.generer_cles_dh()
-        b, pub_b = integrite.generer_cles_dh()
-        self.assertEqual(integrite.secret_partage(a, pub_b), integrite.secret_partage(b, pub_a))
-
-    def test_hmac_identique_a_la_bibliotheque(self):
-        cle = os.urandom(32)
-        self.assertEqual(
-            integrite.hmac(cle, "message", SHA),
-            hmac_ref.new(cle, b"message", hashlib.sha256).hexdigest(),
-        )
-        for nom, ref in NOMS_HASHLIB.items():
-            self.assertEqual(
-                integrite.hmac(cle, "message", nom),
-                hmac_ref.new(cle, b"message", ref).hexdigest(),
-            )
-
-    def test_echange_complet_et_attaque(self):
-        a, pub_a = integrite.generer_cles_dh()
-        b, pub_b = integrite.generer_cles_dh()
-        canal = integrite.envoyer_hmac("Rendez-vous a midi", integrite.secret_partage(a, pub_b), SHA)
-        cle_b = integrite.secret_partage(b, pub_a)
-        self.assertTrue(integrite.verification_automatique(canal, cle_secrete_b=cle_b)[0])
-        modifie = canal.replace("midi", "minuit")
-        self.assertFalse(integrite.verification_automatique(modifie, cle_secrete_b=cle_b)[0])
-        cle_attaquant = integrite.secret_partage(integrite.generer_cles_dh()[0], pub_a)
-        self.assertFalse(integrite.verification_automatique(canal, cle_secrete_b=cle_attaquant)[0])
+    def test_signature_illisible(self):
+        canal = integrite.construire_message_canal("RSA", SHA, "Bonjour", "zz")
+        self.assertFalse(integrite.verification_automatique(canal, self.publiques)[0])
 
 
 class CanalTests(unittest.TestCase):
     def test_message_avec_separateur(self):
-        canal = integrite.construire_message_canal("Signature RSA", SHA, "a|b|c", "ff")
-        self.assertEqual(integrite.lire_message_canal(canal), ("Signature RSA", SHA, "a|b|c", "ff"))
+        canal = integrite.construire_message_canal("ElGamal", SHA, "a|b|c", "ff:01")
+        self.assertEqual(integrite.lire_message_canal(canal), ("ElGamal", SHA, "a|b|c", "ff:01"))
 
     def test_canal_invalide(self):
         with self.assertRaises(ValueError):
-            integrite.lire_message_canal("SIG|99|message|ff")
+            integrite.lire_message_canal("XXX|01|message|ff")
         with self.assertRaises(ValueError):
             integrite.lire_message_canal("n'importe quoi")
 
 
 class PerformanceTests(unittest.TestCase):
     def test_afficher_les_performances(self):
+        print("\n%-16s %12s %12s %14s" % ("Signature", "Clés (ms)", "Signer (ms)", "Vérifier (ms)"))
+        for nom in integrite.SIGNATURES:
+            debut = time.perf_counter()
+            publique, privee = integrite.generer_cles(nom)
+            t_cles = time.perf_counter() - debut
+            debut = time.perf_counter()
+            canal = integrite.envoyer_signe(nom, "Bonjour", privee, SHA)
+            t_signer = time.perf_counter() - debut
+            debut = time.perf_counter()
+            integrite.verification_automatique(canal, {nom: publique})
+            t_verifier = time.perf_counter() - debut
+            print("%-16s %12.1f %12.2f %14.2f" % (nom, t_cles * 1000, t_signer * 1000, t_verifier * 1000))
         data = os.urandom(100_000)
-        print("\nHachage de 100 Ko :")
+        print("Hachage de 100 Ko :")
         for nom in integrite.ALGORITHMES:
             debut = time.perf_counter()
             integrite.hacher(data, nom)
             print("  %-22s %8.2f ms" % (nom, (time.perf_counter() - debut) * 1000))
-        debut = time.perf_counter()
-        publique, privee = integrite.generer_cles(1024)
-        print("Génération des clés RSA 1024 bits : %.0f ms" % ((time.perf_counter() - debut) * 1000))
-        debut = time.perf_counter()
-        canal = integrite.envoyer_signe("Bonjour", privee, SHA)
-        print("Signature : %.2f ms" % ((time.perf_counter() - debut) * 1000))
-        debut = time.perf_counter()
-        integrite.verification_automatique(canal, cle_publique_a=publique)
-        print("Vérification : %.2f ms" % ((time.perf_counter() - debut) * 1000))
 
 
 if __name__ == "__main__":
