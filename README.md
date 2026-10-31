@@ -18,7 +18,7 @@ La clé de chiffrement n'est jamais envoyée dans le canal.
 | `partie4/hachage.py` | SHA-256 écrit entièrement à la main |
 | `partie4/integrite.py` | Envoi de (C, H), vérification H = H', déchiffrement, simulation d'un attaquant |
 | `partie2/` | Chiffrements César, Hill et Playfair utilisés pour obtenir C |
-| `app.py` | Fenêtre CryptoLink : « Envoyer un message » (partie 2) et « Intégrité (SHA-256) » |
+| `app.py` | Fenêtre CryptoLink de la partie 4 : Entity A, Transmission Channel, Entity B |
 | `tests_partie4.py` | 11 tests et mesures de performance |
 
 ## Lancement
