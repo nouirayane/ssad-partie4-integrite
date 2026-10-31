@@ -1,11 +1,4 @@
-"""Fonctions de hachage de la partie 4.
-
-SHA-256 est implémenté entièrement à la main (FIPS 180-4) pour montrer le
-fonctionnement interne d'une fonction de hachage. Les autres algorithmes
-(MD5, SHA-1, SHA-512, SHA3-256) viennent de hashlib et servent de comparaison.
-"""
-
-import hashlib
+"""SHA-256 de la partie 4, implémenté entièrement à la main (FIPS 180-4)."""
 
 # 64 constantes K : 32 premiers bits des parties fractionnaires des racines
 # cubiques des 64 premiers nombres premiers.
@@ -73,64 +66,6 @@ def sha256_manuel(data):
     return b"".join(x.to_bytes(4, "big") for x in state)
 
 
-def _hashlib(name):
-    return lambda data: hashlib.new(name, data).digest()
-
-
-# nom affiché -> (fonction, taille de l'empreinte en bits, statut de sécurité)
-ALGORITHMES = {
-    "SHA-256 (implémenté)": (sha256_manuel, 256, "sûr"),
-    "SHA-512": (_hashlib("sha512"), 512, "sûr"),
-    "SHA3-256": (_hashlib("sha3_256"), 256, "sûr"),
-    "SHA-1": (_hashlib("sha1"), 160, "cassé (SHAttered, 2017)"),
-    "MD5": (_hashlib("md5"), 128, "cassé (collisions faciles)"),
-}
-
-# Code de la fonction de hachage, écrit dans le canal.
-CODES_HASH = {
-    "SHA-256 (implémenté)": "01",
-    "SHA-512": "02",
-    "SHA3-256": "03",
-    "SHA-1": "04",
-    "MD5": "05",
-}
-HASH_PAR_CODE = {code: name for name, code in CODES_HASH.items()}
-
-
-def hacher(texte, algorithme="SHA-256 (implémenté)"):
-    """Retourne l'empreinte (bytes) de texte avec l'algorithme choisi."""
-    if isinstance(texte, str):
-        texte = texte.encode("utf-8")
-    try:
-        fonction = ALGORITHMES[algorithme][0]
-    except KeyError as error:
-        raise ValueError("algorithme de hachage inconnu") from error
-    return fonction(texte)
-
-
-def hacher_hex(texte, algorithme="SHA-256 (implémenté)"):
-    return hacher(texte, algorithme).hex()
-
-
-def bits_differents(empreinte1, empreinte2):
-    """Nombre de bits qui diffèrent entre deux empreintes de même taille."""
-    return sum(bin(x ^ y).count("1") for x, y in zip(empreinte1, empreinte2))
-
-
-def effet_avalanche(texte, algorithme="SHA-256 (implémenté)"):
-    """Inverse le dernier bit du message et mesure le changement de l'empreinte.
-
-    Retourne (texte modifié, empreinte originale, empreinte modifiée,
-    bits changés, taille en bits).
-    """
-    data = texte.encode("utf-8") or b"\x00"
-    modifie = data[:-1] + bytes([data[-1] ^ 0x01])
-    h1 = hacher(data, algorithme)
-    h2 = hacher(modifie, algorithme)
-    return (
-        modifie.decode("utf-8", errors="replace"),
-        h1.hex(),
-        h2.hex(),
-        bits_differents(h1, h2),
-        len(h1) * 8,
-    )
+def sha256_hex(texte):
+    """Empreinte SHA-256 en hexadécimal (64 caractères)."""
+    return sha256_manuel(texte).hex()

@@ -1,75 +1,121 @@
-"""Facade de la partie 4 (intégrité) et format du canal.
+"""Partie 4 : intégrité avec SHA-256 (possibilité 1).
 
-Toutes les méthodes suivent le principe de la signature numérique du cours
-(3.5) : A calcule l'empreinte h = H(M) et la signe avec sa clé PRIVÉE ;
-B recalcule H(M) et vérifie la signature avec la clé PUBLIQUE de A.
-
-Format du message dans le canal :  ALGO|code_hash|message|signature
-La clé privée n'apparaît jamais dans ce format.
+  - A chiffre le message M avec un algorithme de la partie 2 : C.
+  - A calcule l'empreinte H = SHA256(C) et envoie (C, H) dans le canal.
+  - B reçoit (C', H), recalcule H' = SHA256(C') et compare les empreintes.
+  - B ne déchiffre que si H = H' ; sinon le message a été modifié.
 """
 
-from . import elgamal, merkle_hellman, rabin, rsa
-from .arithmetique import exp_mod
-from .hachage import (
-    ALGORITHMES, CODES_HASH, HASH_PAR_CODE, effet_avalanche, hacher, hacher_hex,
-    sha256_manuel,
-)
+from partie2 import ciphers
 
-SIGNATURES = {m.NOM: m for m in (rsa, rabin, elgamal, merkle_hellman)}
-CODES_SIGNATURE = {"RSA": "RSA", "Rabin": "RAB", "ElGamal": "ELG", "Merkle-Hellman": "MKH"}
-SIGNATURE_PAR_CODE = {code: nom for nom, code in CODES_SIGNATURE.items()}
+from .hachage import sha256_hex, sha256_manuel
+
+ALGORITHMES = ["Caesar", "Hill", "Playfair"]
+CLES_PAR_DEFAUT = {"Caesar": "3", "Hill": "3,3,2,5", "Playfair": "monarchy"}
 
 
-def generer_cles(algorithme_signature):
-    return SIGNATURES[algorithme_signature].generer_cles()
+def lire_cle_hill(texte):
+    if "," in texte:
+        nombres = [int(x) for x in texte.split(",")]
+        taille = int(len(nombres) ** 0.5)
+        if taille * taille != len(nombres):
+            raise ValueError("la matrice de Hill doit être carrée")
+        return [nombres[i * taille:(i + 1) * taille] for i in range(taille)]
+    return ciphers.key_from_text(texte)
 
 
-def construire_message_canal(signature_algo, algorithme, message, signature):
-    try:
-        return "%s|%s|%s|%s" % (
-            CODES_SIGNATURE[signature_algo], CODES_HASH[algorithme], message, signature,
-        )
-    except KeyError as error:
-        raise ValueError("algorithme inconnu") from error
+class Chiffrement:
+    """Chiffre et déchiffre avec César, Hill ou Playfair (partie 2).
 
-
-def lire_message_canal(message_canal):
-    """Retourne (algorithme de signature, algorithme de hachage, message, signature)."""
-    parts = message_canal.split("|", 2)
-    if len(parts) != 3 or "|" not in parts[2]:
-        raise ValueError("message du canal invalide : champs manquants")
-    code_signature, code_hash, reste = parts
-    message, signature = reste.rsplit("|", 1)
-    try:
-        return SIGNATURE_PAR_CODE[code_signature], HASH_PAR_CODE[code_hash], message, signature
-    except KeyError as error:
-        raise ValueError("code d'algorithme inconnu dans le canal") from error
-
-
-def envoyer_signe(signature_algo, message, cle_privee, algorithme):
-    """Entité A : h = H(M), S = signature de h avec la clé privée, envoi de (M, S)."""
-    signature = SIGNATURES[signature_algo].signer(message, cle_privee, algorithme)
-    return construire_message_canal(signature_algo, algorithme, message, signature)
-
-
-def verification_automatique(message_canal, cles_publiques):
-    """Entité B : lit l'algorithme dans le canal et vérifie avec la clé publique de A.
-
-    cles_publiques : {nom de l'algorithme de signature: clé publique de A}.
-    Retourne (valide, algorithme de signature, algorithme de hachage, message, h1, h2).
+    Comme dans l'interface de la partie 2, les positions des espaces, de la
+    ponctuation et des lettres ajoutées sont mémorisées au chiffrement puis
+    réutilisées au déchiffrement. Ce sont des métadonnées publiques : la clé
+    n'est jamais placée dans le canal.
     """
-    signature_algo, algorithme, message, signature = lire_message_canal(message_canal)
-    try:
-        valide, h1, h2 = SIGNATURES[signature_algo].verifier(
-            message, signature, cles_publiques[signature_algo], algorithme,
-        )
-    except (ValueError, KeyError):
-        valide, h1, h2 = False, 0, 0          # signature illisible = signature invalide
-    return valide, signature_algo, algorithme, message, h1, h2
+
+    def __init__(self):
+        self.positions_format = []
+        self.remplissage_hill = 0
+        self.positions_x = []
+        self.positions_j = []
+
+    def chiffrer(self, algorithme, texte, cle, sens="droite"):
+        """Retourne le message du canal C, au format code:sens:chiffré."""
+        if algorithme == "Caesar":
+            chiffre = ciphers.caesar(texte, int(cle), sens)
+        elif algorithme == "Hill":
+            cle_hill = lire_cle_hill(cle)
+            self.positions_format = ciphers.format_positions(texte.upper())
+            self.remplissage_hill = (-len(ciphers.clean(texte))) % len(cle_hill)
+            chiffre = ciphers.hill_encrypt(texte, cle_hill)
+        elif algorithme == "Playfair":
+            self.positions_format = ciphers.format_positions(texte.upper())
+            self.positions_x = ciphers.playfair_prepare(texte)[1]
+            self.positions_j = ciphers.playfair_j_positions(texte)
+            chiffre = ciphers.playfair_encrypt(texte, cle)
+        else:
+            raise ValueError("algorithme inconnu")
+        return ciphers.build_channel_message(algorithme, sens, chiffre)
+
+    def dechiffrer(self, message_canal, cle):
+        algorithme = ciphers.decode_channel_message(message_canal)[0]
+        if algorithme == "Caesar":
+            return ciphers.dechiffrement_automatique(message_canal, int(cle))
+        if algorithme == "Hill":
+            clair = ciphers.dechiffrement_automatique(message_canal, cle, hill_key=lire_cle_hill(cle))
+            if self.remplissage_hill:
+                clair = clair[:-self.remplissage_hill]
+            return ciphers.restore_format(clair, self.positions_format)
+        clair = ciphers.dechiffrement_automatique(message_canal, cle)
+        clair = ciphers.playfair_strip_padding(clair, self.positions_x)
+        clair = ciphers.playfair_restore_j(clair, self.positions_j)
+        return ciphers.restore_format(clair, self.positions_format)
+
+
+def envoyer(chiffrement, algorithme, message, cle, sens="droite"):
+    """Entité A : retourne (C, H) avec H = SHA256(C)."""
+    c = chiffrement.chiffrer(algorithme, message, cle, sens)
+    return c, sha256_hex(c)
+
+
+def verifier(c_recu, h_recu):
+    """Entité B : retourne (H = H', H') avec H' = SHA256(C')."""
+    h_calcule = sha256_hex(c_recu)
+    return h_calcule == h_recu.strip().lower(), h_calcule
+
+
+def recevoir(chiffrement, c_recu, h_recu, cle):
+    """Entité B : vérifie l'empreinte puis déchiffre seulement si H = H'.
+
+    Retourne (intègre, H', message déchiffré ou None).
+    """
+    integre, h_calcule = verifier(c_recu, h_recu)
+    if not integre:
+        return False, h_calcule, None
+    return True, h_calcule, chiffrement.dechiffrer(c_recu, cle)
+
+
+def suivante(lettre):
+    base = ord("A") if lettre.isupper() else ord("a")
+    return chr(base + (ord(lettre) - base + 1) % 26)
+
+
+def falsifier(message_canal):
+    """Simule un attaquant : change la première lettre du chiffré (X -> Y).
+
+    Le hash transmis n'est pas modifié. Retourne (C modifié, n° du caractère,
+    ancienne lettre, nouvelle lettre).
+    """
+    prefixe, separateur, chiffre = message_canal.rpartition(":")
+    for i, lettre in enumerate(chiffre):
+        if lettre.isalpha():
+            nouvelle = suivante(lettre)
+            modifie = chiffre[:i] + nouvelle + chiffre[i + 1:]
+            return prefixe + separateur + modifie, i + 1, lettre, nouvelle
+    raise ValueError("aucune lettre à modifier dans le message chiffré")
 
 
 __all__ = [
-    "ALGORITHMES", "SIGNATURES", "construire_message_canal", "lire_message_canal",
-    "envoyer_signe", "verification_automatique", "generer_cles", "hacher", "hacher_hex",
-    "sha256_manuel", "effet_avalanche", "exp_mod",
+    "ALGORITHMES", "CLES_PAR_DEFAUT", "Chiffrement", "envoyer", "verifier", "recevoir",
+    "falsifier", "sha256_hex", "sha256_manuel",
 ]
