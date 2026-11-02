@@ -1,0 +1,34 @@
+Tâche,Partie,Responsables,Période,Jour début,Jour fin,Semaine
+PARTIE 1 — Création de l’interface,Partie 1,Hannah et Ryan,"November 2, 2026 → November 3, 2026",J1,J2,Semaine 1
+PARTIE 2 — Étude théorique de César et de ses failles,Partie 2,Hanaa et Asma,"November 2, 2026 → November 3, 2026",J1,J2,Semaine 1
+PARTIE 2 — Algorithmes de chiffrement et déchiffrement de César,Partie 2,Hanaa et Asma,"November 2, 2026 → November 3, 2026",J1,J2,Semaine 1
+"PARTIE 2 — Implémentation de César (alphabet de 52, décalage)",Partie 2,Hanaa et Asma,"November 4, 2026 → November 5, 2026",J3,J4,Semaine 1
+PARTIE 2 — Rédaction de la partie César,Partie 2,Hanaa et Asma,"November 4, 2026 → November 5, 2026",J3,J4,Semaine 1
+PARTIE 2 — Étude théorique de Hill et de ses failles,Partie 2,Hanaa et Asma,"November 6, 2026 → November 9, 2026",J5,J6,Semaine 1
+PARTIE 2 — Algorithmes de chiffrement et déchiffrement de Hill,Partie 2,Hanaa et Asma,"November 6, 2026 → November 9, 2026",J5,J6,Semaine 1
+"PARTIE 2 — Implémentation de Hill (déterminant, inverse mod 26)",Partie 2,Hanaa et Asma,"November 10, 2026 → November 11, 2026",J7,J8,Semaine 2
+PARTIE 2 — Rédaction de la partie Hill,Partie 2,Hanaa et Asma,"November 10, 2026 → November 11, 2026",J7,J8,Semaine 2
+PARTIE 2 — Étude théorique de Playfair et de ses failles,Partie 2,Hanaa et Asma,"November 12, 2026 → November 13, 2026",J9,J10,Semaine 2
+"PARTIE 2 — Grille 5×5 et préparation du message (I/J, X)",Partie 2,Hanaa et Asma,"November 12, 2026 → November 13, 2026",J9,J10,Semaine 2
+"PARTIE 2 — Implémentation de Playfair (paires, règles)",Partie 2,Hanaa et Asma,"November 16, 2026 → November 17, 2026",J11,J12,Semaine 3
+PARTIE 2 — Rédaction de la partie Playfair,Partie 2,Hanaa et Asma,"November 16, 2026 → November 17, 2026",J11,J12,Semaine 3
+"PARTIE 2 — Codes binaires (000, 001, 010) et intégration Tkinter",Partie 2,Hanaa et Asma,"November 16, 2026 → November 16, 2026",J11,J11,Semaine 3
+"PARTIE 2 — Tests, captures d’écran et finalisation",Partie 2,Hanaa et Asma,"November 17, 2026 → November 17, 2026",J12,J12,Semaine 3
+PARTIE 3 — Analyse du sujet et définition des 3 cas,Partie 3 (développement),Meriem et Ikram,"November 2, 2026 → November 2, 2026",J1,J1,Semaine 1
+PARTIE 3 — Définition des alphabets et validation des entrées,Partie 3 (développement),Meriem et Ikram,"November 3, 2026 → November 3, 2026",J2,J2,Semaine 1
+PARTIE 3 — Vérification de la robustesse des mots de passe,Partie 3 (développement),Meriem et Ikram,"November 4, 2026 → November 4, 2026",J3,J3,Semaine 1
+PARTIE 3 — Chiffrement César et dérivation de clé,Partie 3 (développement),Meriem et Ikram,"November 5, 2026 → November 5, 2026",J4,J4,Semaine 1
+PARTIE 3 — Création et vérification des enregistrements,Partie 3 (développement),Meriem et Ikram,"November 6, 2026 → November 6, 2026",J5,J5,Semaine 1
+PARTIE 3 — Préparation de la liste des mots de passe,Partie 3 (développement),Meriem et Ikram,"November 9, 2026 → November 9, 2026",J6,J6,Semaine 2
+PARTIE 3 — Réalisation de l’attaque par dictionnaire,Partie 3 (développement),Meriem et Ikram,"November 10, 2026 → November 10, 2026",J7,J7,Semaine 2
+PARTIE 3 — Attaque par force brute et attaque combinée,Partie 3 (développement),Meriem et Ikram,"November 11, 2026 → November 11, 2026",J8,J8,Semaine 2
+PARTIE 3 — Conception de l’interface et des 3 zones,Partie 3 (interface),Hannah et Ryan,"November 2, 2026 → November 3, 2026",J1,J2,Semaine 1
+PARTIE 3 — Réalisation de la Zone A : création de compte,Partie 3 (interface),Hannah et Ryan,"November 4, 2026 → November 5, 2026",J3,J4,Semaine 1
+PARTIE 3 — Réalisation de la Zone B : authentification,Partie 3 (interface),Hannah et Ryan,"November 6, 2026 → November 9, 2026",J5,J6,Semaine 1
+PARTIE 3 — Blocage après 3 échecs et temporisation,Partie 3 (interface),Hannah et Ryan,"November 10, 2026 → November 10, 2026",J7,J7,Semaine 2
+PARTIE 3 — Réalisation de la Zone C et affichage des attaques,Partie 3 (interface),Hannah et Ryan,"November 11, 2026 → November 12, 2026",J8,J9,Semaine 2
+PARTIE 4 — Hachage et intégrité (implémentation et vérification),Partie 4,Rayane et Bouchera,"November 12, 2026 → November 17, 2026",J9,J12,Semaine 2
+"Intégration, tests et corrections",Rapport / intégration / tests,Tous ensemble,"November 18, 2026 → November 19, 2026",J13,J14,Semaine 3
+Rapport du projet,Rapport / intégration / tests,Tous ensemble,"November 18, 2026 → November 20, 2026",J13,J15,Semaine 3
+Création de la base de données,Base de données,Ikram,"November 20, 2026 → November 20, 2026",J15,J15,Semaine 3
+Captures d’écran et finalisation,Rapport / intégration / tests,Tous ensemble,"November 20, 2026 → November 20, 2026",J15,J15,Semaine 3
